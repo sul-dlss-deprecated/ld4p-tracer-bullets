@@ -16,6 +16,14 @@ The various scripts called will
 
 All files are moved to the Archive/.. folder for future reference.
 
+#NEW
+
+Since changing the framework to a maven project we will now build and then run the project with commands:
+```
+$ mvn package
+$ mvn exec:java
+```
+
 #TODO
 reconcile_and_store
   breaks up RDF into various entities
