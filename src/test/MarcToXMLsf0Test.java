@@ -13,6 +13,8 @@ public class MarcToXMLsf0Test {
     public void main() throws Exception {
         System.out.println("MarctoXMLsf0 Test");
         log.info("Testing MarcToXMLsf0");
+
+
     }
 
 }
