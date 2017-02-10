@@ -48,6 +48,7 @@ class ConvertToBibframe {
         builder.setLineNumbering(true);
         builder.setWhitespaceStrippingPolicy(WhitespaceStrippingPolicy.ALL);
 
+        // args[0] is a MARC XML collection of records
         XdmNode doc = builder.build(new File(args[0]));
 
         XPathCompiler xpath = proc.newXPathCompiler();
@@ -56,9 +57,12 @@ class ConvertToBibframe {
         XPathSelector selector = xpath.compile("//record").load();
         selector.setContextItem(doc);
 
-        XQueryCompiler comp = proc.newXQueryCompiler();
-        XQueryString xQuery = new XQueryString();
+
+        // Next two lines use the XQueryString class of this project.
+        XQueryString xQuery = new XQueryString();  // this sets up the LOC XQuery converter
         String query = xQuery.query(CREATE_BNODE);
+
+        XQueryCompiler comp = proc.newXQueryCompiler();
         XQueryExecutable exp = comp.compile(query);
         XQueryEvaluator qe = exp.load();
 
@@ -85,6 +89,7 @@ class ConvertToBibframe {
 
         conversionLog.info("\nCONVERTING MARCXML TO BIBFRAME\n");
 
+        // at line 57 the selector is defined to select each MARC record, so item is a MARC record
         for (XdmItem item : selector) {
             XPathSelector cf001s = xpath.compile("controlfield[@tag='001']").load();
             cf001s.setContextItem(item);
@@ -107,6 +112,9 @@ class ConvertToBibframe {
                         for (int j = 0; j < nl.getLength(); j++) {
                             Node cn = nl.item(j);
                             if (cn.getNodeType() == Node.ELEMENT_NODE) {
+                                // ModUris might be given tempnode to modify it.
+                                // Could configure and inject dependencies for
+                                // triple store loaders at this point?
                                 Node tempnode = rdfxml.importNode(cn, true);
                                 rdfrdf.appendChild(tempnode);
                             }
@@ -132,6 +140,10 @@ class ConvertToBibframe {
 
         TransformerFactory tf = TransformerFactory.newInstance();
         Transformer t = tf.newTransformer();
+
+        // ModUris encapsulates anything we want to do with the RDF before it is output (loaded to triple store).
+        // See, for example, https://github.com/sul-dlss/ld4p-tracer-bullets/issues/14
+
 
         //Document source = new DOMSource(rdfxml.getDocumentElement());
         Document modSource = ModUris.forBibframe(rdfxml);
