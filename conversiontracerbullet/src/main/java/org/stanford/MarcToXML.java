@@ -42,7 +42,7 @@ class MarcToXML {
     // Apache Commons-CLI Options
     // https://commons.apache.org/proper/commons-cli/introduction.html
     private static CommandLine cmd = null;
-    private static Options options = new Options();
+    public static Options options = new Options();
 
     private static void printHelp() {
         if (! cmd.hasOption('h'))
@@ -65,7 +65,7 @@ class MarcToXML {
 
     private static Boolean xmlReplace = false;
 
-    private static String xmlOutputPath = null;
+    public static String xmlOutputPath = null;
 
     public static void setXmlOutputPath(String path) {
         if (path != null)

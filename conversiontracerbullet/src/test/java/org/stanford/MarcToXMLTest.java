@@ -1,20 +1,30 @@
 package org.stanford;
 
+import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.junit.*;
 
 import static java.nio.file.Files.createTempDirectory;
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.lang.reflect.*;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.junit.runner.RunWith;
 import org.marc4j.*;
 import org.marc4j.marc.Record;
+import org.powermock.modules.junit4.PowerMockRunner;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+
 import org.xml.sax.SAXException;
 
 import javax.xml.XMLConstants;
@@ -27,6 +37,9 @@ import javax.xml.validation.Validator;
 /**
  *
  */
+@RunWith(PowerMockRunner.class)
+@PowerMockIgnore("javax.management.*")
+@PrepareForTest({ MarcToXML.class })
 public class MarcToXMLTest {
 
     private static String logFile;
@@ -34,8 +47,8 @@ public class MarcToXMLTest {
 
     // For additional test data, consider the marc4j data at
     // https://github.com/marc4j/marc4j/tree/master/test/resources
-    //private String marcFileResource = "/sample_marc.mrc";
     private final String marcFileResource = "/one_record.mrc";
+    private final String marcFilePath = getClass().getResource(marcFileResource).getFile();
     // MARC21 XML schema
     // https://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd
     private final String marcSchemaResource = "/MARC21slim.xsd";
@@ -50,7 +63,7 @@ public class MarcToXMLTest {
         MarcToXML.setLogger(logFile);
         MarcToXML.setXmlOutputPath(outputPath.toString());
         // Read a MARC binary file resource
-        String marcFilePath = getClass().getResource(marcFileResource).getFile();
+        MarcToXML.setMarcInputFile(marcFilePath);
         marcReader = new MarcStreamReader(new FileInputStream(marcFilePath));
         assertTrue(marcReader.hasNext());
     }
@@ -60,11 +73,15 @@ public class MarcToXMLTest {
         FileUtils.deleteDirectory(outputPath.toFile());
     }
 
-    @Ignore("This does not yet test anything in MarcToXML\n")
+    //  @Ignore("This does not yet test anything in MarcToXML\n")
     @Test
     public void main() throws Exception {
         // TODO: this can simply confirm that a MARC file is read
         // TODO: and that the main method calls the .convertRecord method N-times.
+        String [] args = new String[] {"-i" + marcFilePath};
+        MarcToXML.main(args);
+        Options options = MarcToXML.options;
+        assertNotNull(options.getMatchingOptions("h"));
     }
 
     @Test
@@ -85,7 +102,27 @@ public class MarcToXMLTest {
     // TODO: use a test MARC record that requires AuthDB access to resolve URIs?
 
     @Test
-    public void marcRecordFileNameTest() {
+    public void inputFileNameTest() {
+        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(errContent));
+        String noFilePath = null;
+        try {
+            MarcToXML.setMarcInputFile(noFilePath);
+        } catch (Throwable expected) {
+            assertEquals(NullPointerException.class, expected.getClass());
+        }
+        String errMsg = "ERROR: No MARC input file specified.\n";
+        assertEquals(errMsg, errContent.toString());
+    }
+
+    @Test
+    public void outputFileNameTest() {
+        PowerMockito.mockStatic(System.class);
+        PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(outputPath.toString());
+        String noFilePath = null;
+        MarcToXML.setXmlOutputPath(noFilePath);
+        assertEquals(MarcToXML.xmlOutputPath, System.getenv("LD4P_MARCXML"));
+
         marcRecord = marcReader.next();
         String result = MarcToXML.xmlOutputFilePath(marcRecord);
         assertTrue(result.contains(outputPath.toString()));
@@ -94,6 +131,7 @@ public class MarcToXMLTest {
         String fmt = ".xml";
         assertTrue(result.contains(fmt));
     }
+
 
     private boolean marcXmlValid(String marcXmlFilePath) {
         try {
