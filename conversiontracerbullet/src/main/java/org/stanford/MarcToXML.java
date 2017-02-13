@@ -41,7 +41,7 @@ class MarcToXML {
 
     // Apache Commons-CLI Options
     // https://commons.apache.org/proper/commons-cli/introduction.html
-    private static CommandLine cmd = null;
+    public static CommandLine cmd = null;
     public static Options options = new Options();
 
     private static void printHelp() {
@@ -63,7 +63,7 @@ class MarcToXML {
         }
     }
 
-    private static Boolean xmlReplace = false;
+    public static Boolean xmlReplace = false;
 
     public static String xmlOutputPath = null;
 
@@ -162,8 +162,7 @@ class MarcToXML {
         try {
             String xmlFilePath = xmlOutputFilePath(record);
             File xmlFile = new File(xmlFilePath);
-            Boolean doConversion = (! xmlFile.exists()) || xmlReplace;
-            if (doConversion) {
+            if (doConversion(xmlFile, xmlReplace)) {
                 MarcWriter writer = marcRecordWriter(xmlFilePath);
                 marcResolveAuthorities(record);
                 writer.write(record);
@@ -227,6 +226,15 @@ class MarcToXML {
         String outFileName = cn.replaceAll(" ", "_").toLowerCase() + ".xml";
         Path outFilePath = Paths.get(xmlOutputPath, outFileName);
         return outFilePath.toString();
+    }
+
+    public static Boolean doConversion (File xmlFile, Boolean xmlReplace) {
+        if (!xmlFile.exists() || xmlReplace) {
+             return true;
+         }
+         else {
+             return false;
+         }
     }
 
     private static MarcWriter marcRecordWriter(String filePath) throws FileNotFoundException {
