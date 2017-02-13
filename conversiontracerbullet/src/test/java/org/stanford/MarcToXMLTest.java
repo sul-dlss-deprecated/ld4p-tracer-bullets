@@ -44,6 +44,7 @@ public class MarcToXMLTest {
 
     private static String logFile;
     private static Path outputPath;
+    private static Options options = MarcToXML.options;
 
     // For additional test data, consider the marc4j data at
     // https://github.com/marc4j/marc4j/tree/master/test/resources
@@ -80,12 +81,11 @@ public class MarcToXMLTest {
         // TODO: and that the main method calls the .convertRecord method N-times.
         String [] args = new String[] {"-i" + marcFilePath};
         MarcToXML.main(args);
-        Options options = MarcToXML.options;
         assertNotNull(options.getMatchingOptions("h"));
     }
 
     @Test
-    public void convertRecordTest() throws FileNotFoundException {
+    public void convertRecordTest() throws FileNotFoundException, ParseException {
         assertTrue(marcReader.hasNext());
         marcRecord = marcReader.next();
         MarcToXML.convertMarcRecord(marcRecord);
@@ -93,6 +93,14 @@ public class MarcToXMLTest {
         File file = new File(marcXmlFilePath);
         assertTrue(file.exists());
         assertTrue(marcXmlValid(marcXmlFilePath));
+
+        MarcToXML.convertMarcRecord(marcRecord);
+        CommandLineParser parser = new DefaultParser();
+        String [] args = new String[] {"-r"};
+        CommandLine cmd = parser.parse(options, args);
+        Boolean xmlReplace = cmd.hasOption("r");
+        Boolean doConversion = MarcToXML.doConversion(file, xmlReplace);
+        assertTrue(doConversion);
     }
 
     // TODO: read in the one_record.xml file
@@ -131,7 +139,6 @@ public class MarcToXMLTest {
         String fmt = ".xml";
         assertTrue(result.contains(fmt));
     }
-
 
     private boolean marcXmlValid(String marcXmlFilePath) {
         try {
