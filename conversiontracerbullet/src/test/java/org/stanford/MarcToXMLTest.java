@@ -1,11 +1,13 @@
 package org.stanford;
 
+import oracle.jdbc.pool.OracleDataSource;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.junit.*;
 
 import static java.nio.file.Files.createTempDirectory;
 import static org.junit.Assert.*;
+import static org.stanford.MarcToXML.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -13,13 +15,15 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.lang.reflect.*;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 
 import org.junit.runner.RunWith;
 import org.marc4j.*;
 import org.marc4j.marc.Record;
+import org.mockito.*;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
@@ -34,12 +38,14 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 
+import static org.junit.Assume.*;
+
 /**
  *
  */
 @RunWith(PowerMockRunner.class)
 @PowerMockIgnore("javax.management.*")
-@PrepareForTest({ MarcToXML.class })
+@PrepareForTest({ MarcToXML.class, AuthDBConnection.class })
 public class MarcToXMLTest {
 
     private static String logFile;
@@ -61,10 +67,10 @@ public class MarcToXMLTest {
     public void setUp() throws IOException {
         outputPath = createTempDirectory("MarcToXMLTest_");
         logFile = File.createTempFile("MarcToXMLTest_", ".log", outputPath.toFile()).toString();
-        MarcToXML.setLogger(logFile);
-        MarcToXML.setXmlOutputPath(outputPath.toString());
+        setLogger(logFile);
+        setXmlOutputPath(outputPath.toString());
         // Read a MARC binary file resource
-        MarcToXML.setMarcInputFile(marcFilePath);
+        setMarcInputFile(marcFilePath);
         marcReader = new MarcStreamReader(new FileInputStream(marcFilePath));
         assertTrue(marcReader.hasNext());
     }
@@ -79,27 +85,32 @@ public class MarcToXMLTest {
     public void main() throws Exception {
         // TODO: this can simply confirm that a MARC file is read
         // TODO: and that the main method calls the .convertRecord method N-times.
+        PowerMockito.mockStatic(System.class);
+        PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(outputPath.toString());
         String [] args = new String[] {"-i" + marcFilePath};
         MarcToXML.main(args);
         assertNotNull(options.getMatchingOptions("h"));
     }
 
     @Test
-    public void convertRecordTest() throws FileNotFoundException, ParseException {
+    public void convertRecordTest() throws IOException, ParseException {
+        outputPath = createTempDirectory("MarcToXMLTest_");
+        PowerMockito.mockStatic(System.class);
+        PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(outputPath.toString());
         assertTrue(marcReader.hasNext());
         marcRecord = marcReader.next();
-        MarcToXML.convertMarcRecord(marcRecord);
-        String marcXmlFilePath = MarcToXML.xmlOutputFilePath(marcRecord);
+        String marcXmlFilePath = xmlOutputFilePath(marcRecord);
+        convertMarcRecord(marcRecord);
         File file = new File(marcXmlFilePath);
         assertTrue(file.exists());
         assertTrue(marcXmlValid(marcXmlFilePath));
 
-        MarcToXML.convertMarcRecord(marcRecord);
+        convertMarcRecord(marcRecord);
         CommandLineParser parser = new DefaultParser();
         String [] args = new String[] {"-r"};
         CommandLine cmd = parser.parse(options, args);
         Boolean xmlReplace = cmd.hasOption("r");
-        Boolean doConversion = MarcToXML.doConversion(file, xmlReplace);
+        Boolean doConversion = doConversion(file, xmlReplace);
         assertTrue(doConversion);
     }
 
@@ -115,7 +126,7 @@ public class MarcToXMLTest {
         System.setErr(new PrintStream(errContent));
         String noFilePath = null;
         try {
-            MarcToXML.setMarcInputFile(noFilePath);
+            setMarcInputFile(noFilePath);
         } catch (Throwable expected) {
             assertEquals(NullPointerException.class, expected.getClass());
         }
@@ -128,16 +139,36 @@ public class MarcToXMLTest {
         PowerMockito.mockStatic(System.class);
         PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(outputPath.toString());
         String noFilePath = null;
-        MarcToXML.setXmlOutputPath(noFilePath);
-        assertEquals(MarcToXML.xmlOutputPath, System.getenv("LD4P_MARCXML"));
+        setXmlOutputPath(noFilePath);
+        assertEquals(xmlOutputPath, System.getenv("LD4P_MARCXML"));
 
         marcRecord = marcReader.next();
-        String result = MarcToXML.xmlOutputFilePath(marcRecord);
+        String result = xmlOutputFilePath(marcRecord);
         assertTrue(result.contains(outputPath.toString()));
         String cn = marcRecord.getControlNumber();
         assertTrue(result.contains(cn));
         String fmt = ".xml";
         assertTrue(result.contains(fmt));
+    }
+
+    @Test
+    public void setAuthConnectionTest () {
+        try {
+            assertTrue(MarcToXML.authDB == null);
+            MarcToXML.setAuthConnection();
+        } catch (Throwable expected) {
+            assertNotEquals(IOException.class, expected.getClass());
+            assertNotEquals(SQLException.class, expected.getClass());
+        }
+
+        try {
+            MarcToXML.authDB = Mockito.mock(Connection.class);
+            MarcToXML.setAuthConnection();
+            assertFalse(MarcToXML.authDB == null);
+        } catch (Throwable expected) {
+            assertNotEquals(IOException.class, expected.getClass());
+            assertNotEquals(SQLException.class, expected.getClass());
+        }
     }
 
     private boolean marcXmlValid(String marcXmlFilePath) {

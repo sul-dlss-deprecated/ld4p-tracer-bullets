@@ -37,7 +37,7 @@ import java.util.List;
  */
 class MarcToXML {
 
-    private static Connection authDB = null;
+    public static Connection authDB = null;
 
     // Apache Commons-CLI Options
     // https://commons.apache.org/proper/commons-cli/introduction.html
@@ -164,6 +164,7 @@ class MarcToXML {
             File xmlFile = new File(xmlFilePath);
             if (doConversion(xmlFile, xmlReplace)) {
                 MarcWriter writer = marcRecordWriter(xmlFilePath);
+
                 marcResolveAuthorities(record);
                 writer.write(record);
                 writer.close();
@@ -173,6 +174,7 @@ class MarcToXML {
             }
         }
         catch (IOException | SQLException | NullPointerException | MarcException e) {
+            e.printStackTrace();
             reportErrors(e);
         }
     }
@@ -199,19 +201,7 @@ class MarcToXML {
                 String data = sf.getData();
 
                 if (codeStr.equals("=")) {
-                    setAuthConnection();
-
-                    String key = data.substring(2);
-                    String authID = AuthIDfromDB.lookup(key, authDB);
-
-                    //TODO consider just getting all the URI's from the authority record here
-                    String[] tagNs = {"920", "921", "922"};
-                    for (String n : tagNs) {
-                        String uri = AuthURIfromDB.lookup(authID, n, authDB);
-                        if (uri.length() > 0)
-                            dataField.addSubfield(factory.newSubfield('0', uri));
-                    }
-                    dataField.removeSubfield(sf);
+                    addAuthURIandRemoveSubfields(data, dataField, sf, factory);
                 }
                 if (codeStr.equals("?")) {
                     dataField.removeSubfield(sf);
@@ -237,14 +227,31 @@ class MarcToXML {
          }
     }
 
+    public static void addAuthURIandRemoveSubfields(String data, DataField dataField,
+                                                    Subfield sf, MarcFactory factory) throws IOException, SQLException {
+        setAuthConnection();
+
+        String key = data.substring(2);
+        String authID = AuthIDfromDB.lookup(key, authDB);
+
+        //TODO consider just getting all the URI's from the authority record here
+        String[] tagNs = {"920", "921", "922"};
+        for (String n : tagNs) {
+            String uri = AuthURIfromDB.lookup(authID, n, authDB);
+            if (uri.length() > 0)
+                dataField.addSubfield(factory.newSubfield('0', uri));
+        }
+        dataField.removeSubfield(sf);
+    }
+
+    public static void setAuthConnection() throws IOException, SQLException {
+        if ( authDB == null )
+            authDB = AuthDBConnection.open();
+    }
+
     private static MarcWriter marcRecordWriter(String filePath) throws FileNotFoundException {
         OutputStream outFileStream = new FileOutputStream(filePath);
         return new MarcXmlWriter(outFileStream, true);
-    }
-
-    private static void setAuthConnection() throws IOException, SQLException {
-        if ( authDB == null )
-            authDB = AuthDBConnection.open();
     }
 
     private static void reportErrors(Exception e) {
