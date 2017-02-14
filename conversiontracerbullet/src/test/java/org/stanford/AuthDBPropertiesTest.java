@@ -1,10 +1,17 @@
 package org.stanford;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -18,7 +25,14 @@ import java.util.Properties;
 import static java.nio.file.Files.createTempDirectory;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+
+//@RunWith(PowerMockRunner.class)
+//@PrepareForTest(AuthDBProperties.class)
+//@PrepareForTest({AuthDBProperties.class, Class.class})
 public class AuthDBPropertiesTest {
 
     /*
@@ -27,9 +41,11 @@ public class AuthDBPropertiesTest {
      */
 
     private AuthDBProperties authProps;
+    private Logger log = LogManager.getLogger(AuthDBProperties.class.getName());
     private Properties serverConf;
-    private String propertyFile;
-    private String propertyResource;
+//    private String propertyFile;
+//    private String propertyResource;
+    private String serverConfResourceName = "/server.conf";
     private File serverConfFile;
     private File tmpDir;
 
@@ -39,8 +55,9 @@ public class AuthDBPropertiesTest {
         authProps = new AuthDBProperties();
 
 //        // Use private method to get the server.conf file path
+//
 //        Field f;
-//        f = AuthDBProperties.class.getDeclaredField("propertyFile");
+//        f = AuthDBProperties.class.getDeclaredField("propertyResourceFile");
 //        f.setAccessible(true);
 //        propertyFile = (String) f.get(authProps);
 //        serverConfFile = new File(propertyFile);
@@ -49,13 +66,17 @@ public class AuthDBPropertiesTest {
 //        f.setAccessible(true);
 //        propertyResource = (String) f.get(authProps);
 //
-//        // Use private method to get the server.conf properties
-//        Method m = AuthDBProperties.class.getDeclaredMethod("loadDataSourceProperties");
-//        m.setAccessible(true);
-//        serverConfFile = new File(propertyResource);
         Method m = AuthDBProperties.class.getDeclaredMethod("loadPropertyResource");
         m.setAccessible(true);
         serverConf = (Properties) m.invoke(authProps);
+    }
+
+    public void setServerConfFile() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        // Use private method to get the server.conf properties file
+        Method m = AuthDBProperties.class.getDeclaredMethod("propertyResourceFile");
+        m.setAccessible(true);
+        String serverConfFileName = (String) m.invoke(authProps);
+        serverConfFile = new File(serverConfFileName);
     }
 
     @After
@@ -71,9 +92,9 @@ public class AuthDBPropertiesTest {
         assertEquals(serverConf.getProperty("SERVICE_NAME"), authProps.getService());
     }
 
-    @Ignore
     @Test
-    public void testConstructorWithString() throws IOException {
+    public void testConstructorWithString() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        setServerConfFile();
         FileUtils.copyFileToDirectory(serverConfFile, tmpDir);
         String customConfigFile = Paths.get(tmpDir.toString(), serverConfFile.getName()).toString();
         AuthDBProperties customProps = new AuthDBProperties(customConfigFile);
@@ -142,24 +163,22 @@ public class AuthDBPropertiesTest {
 
     @Ignore("This is not working as expected")
     @Test
-    public void testMissingDefaultProperties() throws IOException {
-        File tmpConfFile = Paths.get(tmpDir.toString(), serverConfFile.getName()).toFile();
-        assertTrue(serverConfFile.exists());
-        assertFalse(tmpConfFile.exists());
+    public void testMissingDefaultProperties() {
+        Class authClass = AuthDBProperties.class;
+//        Object authClassSpy = spy(authClass);
+        String exception = "Cannot find /server.conf";
+
+        PowerMockito.mockStatic(AuthDBProperties.class);
+        PowerMockito.mockStatic(Class.class);
+        PowerMockito.when(authClass.getResourceAsStream(serverConfResourceName)).thenThrow(new IOException(exception));
+
         boolean thrown = false;
         try {
-            FileUtils.moveFile(serverConfFile, tmpConfFile);
-            assertFalse(serverConfFile.exists());
-            assertTrue(tmpConfFile.exists());
-            new AuthDBProperties();
-        } catch (NullPointerException e) {
-            thrown = true;
+            AuthDBProperties props = new AuthDBProperties();
+//            verify(log.fatal("Failed to load resource file"));
         } catch (Exception e) {
-            thrown = false;
+            thrown = true;
         }
-        FileUtils.moveFile(tmpConfFile, serverConfFile);
-        assertTrue(serverConfFile.exists());
-        assertFalse(tmpConfFile.exists());
         assertTrue(thrown);
     }
 }
