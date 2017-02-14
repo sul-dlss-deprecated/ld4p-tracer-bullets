@@ -1,6 +1,5 @@
 package org.stanford;
 
-import oracle.jdbc.pool.OracleDataSource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -8,8 +7,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Properties;
 
 /**
@@ -96,7 +93,7 @@ class AuthDBProperties {
     }
 
     private Properties loadPropertyResource() {
-        Class cls = AuthDBConnection.class;
+        Class cls = AuthDBProperties.class;
         InputStream in = null;
         Properties props = new Properties();
         try {
