@@ -28,6 +28,5 @@ buildNumber.properties
 
 conversiontracerbullet/src/main/resources/server.conf
 conversiontracerbullet/src/test/resources/server.conf
-conversiontracerbullet/src/test/resources/one_record.*
 files/
 
