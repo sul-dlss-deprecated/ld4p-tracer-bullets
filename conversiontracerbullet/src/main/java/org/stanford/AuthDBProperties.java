@@ -1,6 +1,5 @@
 package org.stanford;
 
-import oracle.jdbc.pool.OracleDataSource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -8,8 +7,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Properties;
 
 /**
@@ -19,22 +16,22 @@ class AuthDBProperties {
 
     private static Logger log = LogManager.getLogger(AuthDBProperties.class.getName());
 
-    private static final String DEFAULT_CONFIG_FILE = "/server.conf";
+    private static final String PROPERTY_RESOURCE = "/server.conf";
 
     private String server = null;
     private String service = null;
     private String userName = null;
     private String userPass = null;
-    private String propertyFile = null;
+    private Properties properties = null;
 
     public AuthDBProperties() throws IOException {
         // initialize using the default property file resource
-        this.propertyFile = propertyFileResource();
+        properties = loadPropertyResource();
         initDataSourceProperties();
     }
 
     public AuthDBProperties(String propertyFile) throws IOException {
-        this.propertyFile = propertyFile;
+        properties = loadPropertyFile(propertyFile);
         initDataSourceProperties();
     }
 
@@ -74,36 +71,65 @@ class AuthDBProperties {
         this.userPass = userPass;
     }
 
-    private void initDataSourceProperties() throws IOException {
+    private void initDataSourceProperties() {
+        this.server = properties.getProperty("SERVER");
+        this.service = properties.getProperty("SERVICE_NAME");
+        this.userName = properties.getProperty("USER");
+        this.userPass = properties.getProperty("PASS");
+    }
+
+    private Properties loadPropertyFile(String propertyFile) throws IOException {
         try {
-            Properties props = loadDataSourceProperties(propertyFile);
-            this.server = props.getProperty("SERVER");
-            this.service = props.getProperty("SERVICE_NAME");
-            this.userName = props.getProperty("USER");
-            this.userPass = props.getProperty("PASS");
+            FileInputStream iStream = new FileInputStream(propertyFile);
+            Properties props = new Properties();
+            props.load(iStream);
+            iStream.close();
+            log.debug( props.toString() );
+            return props;
         } catch (IOException e) {
             log.fatal("Failed to initialize AuthDBProperties", e);
             throw e;
         }
     }
 
-    private static Properties loadDataSourceProperties(String propertyFile) throws IOException {
-        FileInputStream iStream = new FileInputStream(propertyFile);
+    private Properties loadPropertyResource() {
+        Class cls = AuthDBProperties.class;
+        InputStream in = null;
         Properties props = new Properties();
-        props.load(iStream);
-        iStream.close();
-        log.debug( props.toString() );
+        try {
+            in = cls.getResourceAsStream(PROPERTY_RESOURCE);
+            props.load(in);
+            log.debug( props.toString() );
+        } catch (IOException e) {
+            log.fatal("Failed to load resource file", e);
+            propertyResourceFile();
+        } finally {
+            try {
+                if( in != null )
+                    in.close();
+            } catch (IOException e) {
+                log.fatal("Failed to close resource file stream", e);
+            }
+        }
         return props;
     }
 
-    private static String propertyFileResource() {
+    private String propertyResourceFile() {
         Class cls = AuthDBProperties.class;
-        URL path = cls.getResource(DEFAULT_CONFIG_FILE);
-        if (path == null)
-            path = cls.getClassLoader().getResource(DEFAULT_CONFIG_FILE);
-        if (path == null)
+        URL path = cls.getResource(PROPERTY_RESOURCE);
+        if (path == null) {
+            log.debug("Failed to cls.getResource()");
+            path = cls.getClassLoader().getResource(PROPERTY_RESOURCE);
+            if (path == null)
+                log.debug("Failed to cls.getClassLoader().getResource()");
+        }
+        if (path != null) {
+            log.debug(path.getFile());
+            return path.getFile();
+        } else {
             log.fatal("Failed to find default server.conf file resource");
-        return path.getFile();
+            return null;
+        }
     }
 
 }
