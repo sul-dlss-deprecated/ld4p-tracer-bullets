@@ -27,6 +27,7 @@ import org.mockito.*;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 
 import org.xml.sax.SAXException;
@@ -44,7 +45,7 @@ import static org.junit.Assume.*;
  *
  */
 @RunWith(PowerMockRunner.class)
-@PowerMockIgnore("javax.management.*")
+@PowerMockIgnore({"javax.management.*", "oracle.xdb.XMLType"})
 @PrepareForTest({ MarcToXML.class, AuthDBConnection.class })
 public class MarcToXMLTest {
 
@@ -86,9 +87,15 @@ public class MarcToXMLTest {
         // TODO: this can simply confirm that a MARC file is read
         // TODO: and that the main method calls the .convertRecord method N-times.
         PowerMockito.mockStatic(System.class);
-        PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(outputPath.toString());
+        PowerMockito.when(System.getenv("LD4P_MARCXML")).thenReturn(null);
         String [] args = new String[] {"-i" + marcFilePath};
-        MarcToXML.main(args);
+        try {
+            MarcToXML.main(args);
+        } catch (FileNotFoundException expected) {
+            assertEquals(FileNotFoundException.class, expected.getClass());
+        } catch (NullPointerException expected) {
+            assertEquals(NullPointerException.class, expected.getClass());
+        }
         assertNotNull(options.getMatchingOptions("h"));
     }
 
@@ -117,7 +124,6 @@ public class MarcToXMLTest {
     // TODO: read in the one_record.xml file
     // TODO: use XMLUnit to check the output file has the same content
     // TODO: see http://www.xmlunit.org/
-
     // TODO: use a test MARC record that requires AuthDB access to resolve URIs?
 
     @Test
@@ -152,7 +158,7 @@ public class MarcToXMLTest {
     }
 
     @Test
-    public void setAuthConnectionTest () {
+    public void setAuthConnectionTest() {
         try {
             assertTrue(MarcToXML.authDB == null);
             MarcToXML.setAuthConnection();

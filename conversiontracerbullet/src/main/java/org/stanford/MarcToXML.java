@@ -154,7 +154,7 @@ class MarcToXML {
         FileInputStream marcInputFileStream = new FileInputStream(marcInputFile);
         MarcReader marcReader = new MarcStreamReader(marcInputFileStream);
         while (marcReader.hasNext()) {
-            convertMarcRecord( marcReader.next() );
+            convertMarcRecord(marcReader.next());
         }
     }
 
@@ -174,7 +174,6 @@ class MarcToXML {
             }
         }
         catch (IOException | SQLException | NullPointerException | MarcException e) {
-            e.printStackTrace();
             reportErrors(e);
         }
     }
@@ -250,7 +249,7 @@ class MarcToXML {
     }
 
     private static MarcWriter marcRecordWriter(String filePath) throws FileNotFoundException {
-        OutputStream outFileStream = new FileOutputStream(filePath);
+        OutputStream outFileStream = new FileOutputStream(filePath);;
         return new MarcXmlWriter(outFileStream, true);
     }
 
@@ -258,6 +257,6 @@ class MarcToXML {
         String msg = e.getMessage();
         log.fatal(msg);
         System.err.println(msg);
-        e.printStackTrace();
+        //e.printStackTrace();
     }
 }
